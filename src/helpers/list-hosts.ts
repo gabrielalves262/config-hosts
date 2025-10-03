@@ -23,20 +23,22 @@ export const listHosts = async (): Promise<void> => {
     .split('\n')
     .map((line, index) => {
       const trimmedLine = line.trim();
-      if(trimmedLine.startsWith('#') || trimmedLine === '')
+      if (trimmedLine.startsWith('#') || trimmedLine === '')
         return null;
 
       const [ip, ...rest] = trimmedLine.split(' ');
       const [aliasesString, ...comments] = rest.join(' ').split('#');
       const comment = comments.join('#').trim();
 
-      const aliases = aliasesString.split(',').map(alias => alias.trim());
+      const aliases = aliasesString.split(' ').map(alias => alias.trim()).filter(Boolean);
 
       return { index: index + 1, ip, aliases, comment, raw: line };
     })
     .filter((entry): entry is HostEntry => entry !== null);
 
-    hosts.forEach(host => {
-      console.log(`${host.ip.padEnd(15, ' ')}\t${host.aliases.join(', ')}`);
+  hosts.forEach(host => {
+    host.aliases.forEach(alias => {
+      console.log(`${host.ip.padEnd(15, ' ')}\t${alias}`);
     })
+  })
 }

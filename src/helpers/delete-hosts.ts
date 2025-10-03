@@ -21,11 +21,11 @@ export const deleteHosts = async (aliases?: string[]) => {
         if (trimmedLine.startsWith('#') || trimmedLine === '')
           return null;
 
-        const [ip, ...rest] = trimmedLine.split(' ');
+        const [ip, ...rest] = trimmedLine.split(' ').filter(Boolean);
         const [aliasesString, ...comments] = rest.join(' ').split('#');
         const comment = comments.join('#').trim();
 
-        const aliases = aliasesString.split(',').map(alias => alias.trim());
+        const aliases = aliasesString.split(' ').map(alias => alias.trim()).filter(Boolean);
 
         return { index: index + 1, ip, aliases, comment, raw: line };
       })
@@ -51,12 +51,12 @@ export const deleteHosts = async (aliases?: string[]) => {
 
   for (const line of lines) {
     if (line.trim().startsWith('#') || line.trim() === '') {
-      newLines.push(line);
+      newLines.push(line.trimStart());
       continue;
     }
 
-    const [ip, ...rest] = line.split(' ');
-    const [aliasesString, ...comments] = rest.join(' ').split('#');
+    const [ip, ...rest] = line.split(' ').filter(Boolean);
+    const [aliasesString, ...comments] = rest.join(' ').split('#').filter(Boolean);
     const comment = comments.join('#').trim();
     const lineAliases = aliasesString.split(' ').map(alias => alias.trim()).filter(Boolean);
 
@@ -65,7 +65,7 @@ export const deleteHosts = async (aliases?: string[]) => {
     if (hasAliasToDelete) {
       const newAliases = lineAliases.filter(alias => !domainMatched(alias, ...aliases));
       if (newAliases.length > 0) {
-        newLines.push(`${ip} ${newAliases.join(', ')}${comment ? ' # ' + comment : ''}`);
+        newLines.push(`  ${ip} ${newAliases.join(', ')}${comment ? ' # ' + comment : ''}`);
       }
 
       const removedAliases = lineAliases.filter(alias => !newAliases.includes(alias));
