@@ -9,6 +9,10 @@
     "config-hosts": "./dist/index.js"
   },
   "main": "./dist/index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabrielalves262/config-hosts.git"
+  },
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target bun",
     "start": "bun run src/index.ts"
@@ -23,5 +27,6 @@
     "commander": "^14.0.1",
     "inquirer": "^12.9.6",
     "is-admin": "^4.0.0"
-  }
+  },
+  "license": "MIT"
 }
