@@ -1,0 +1,27 @@
+{
+  "name": "config-hosts",
+  "description": "Uma ferramenta para configurar entradas no arquivo de hosts do sistema.",
+  "version": "0.1.0",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "config-hosts": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun run src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "commander": "^14.0.1",
+    "inquirer": "^12.9.6",
+    "is-admin": "^4.0.0"
+  }
+}
