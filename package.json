@@ -1,7 +1,7 @@
 {
   "name": "config-hosts",
   "description": "Uma ferramenta para configurar entradas no arquivo de hosts do sistema.",
-  "version": "0.1.1",
+  "version": "1.0.1",
   "module": "index.ts",
   "type": "module",
   "bin": {
@@ -25,7 +25,8 @@
   "dependencies": {
     "commander": "^14.0.1",
     "inquirer": "^12.9.6",
-    "is-admin": "^4.0.0"
+    "is-admin": "^4.0.0",
+    "picocolors": "^1.1.1"
   },
   "license": "MIT"
 }

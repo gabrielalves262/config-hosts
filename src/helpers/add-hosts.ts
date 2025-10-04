@@ -1,113 +1,172 @@
 import inquirer from 'inquirer';
 import fs from 'fs';
-import { isIPv4 } from 'net';
+import { isIPv4, isIPv6 } from 'net';
 import { getHostsFile } from './get-hosts-file.js';
 import { isValidDomain } from '../utils.js';
+import { Entry, EntryHost, parseEntries } from './parser.js';
+import { writeHosts } from './write-hosts.js';
 
-type Definitions = {
-  ip: string;
-  aliases: string[];
+export type AddOptions = {
+  /** 
+   * Comentário a ser adicionado ao final de cada linha no arquivo de hosts.
+   * Pode ser uma string ou null para nenhum comentário.
+   * 
+   * @default 'Adicionado com config-hosts'
+   * 
+   */
+  comment?: string | null;
+
+  /** 
+   * Adiciona todas as entradas adicionadas em uma única linha.
+   * 
+   * [group=true]:
+   * 
+   * 127.0.0.1 example.com test.com demo.com # Adicionado com config-hosts
+   * 
+   * [group=false]:
+   * 
+   * 127.0.0.1 example.com # Adicionado com config-hosts
+   * 
+   * 127.0.0.1 test.com    # Adicionado com config-hosts
+   * 
+   * 127.0.0.1 demo.com    # Adicionado com config-hosts
+   * 
+   * @default false
+   * 
+   */
+  oneline?: boolean
 }
 
 /** 
- * Adiciona entradas ao arquivo de hosts do sistema.
- * Requer privilégios de administrador.
- * @param ip O endereço IP a ser associado aos aliases.
- * @param aliases Uma lista de aliases (nomes de host) a serem associados ao IP.
+ * Solicita ao usuário que insira um endereço IP válido.
+ * 
+ * @returns Uma Promise que resolve para o endereço IP inserido pelo usuário.
  */
-const setHosts = async (ip: string, aliases: string[]) => {
-  const hostsFile = getHostsFile();
-
-  console.info(`Modificando o arquivo de hosts em: ${hostsFile}`);
-
-  let content = aliases.map(alias => `${ip} ${alias}`).join('\n');
-
-  await fs.promises.appendFile(hostsFile, `\n${content}`);
-
-  console.info('Hosts configurados com sucesso!');
-}
-
-
-/** 
- * Configura o arquivo de hosts do sistema, interativamente se necessário.
- * Requer privilégios de administrador.
- * @param ip O endereço IP a ser associado aos aliases. Se não fornecido, será solicitado ao usuário.
- * @param aliases Uma lista de aliases (nomes de host) a serem associados ao IP. Se não fornecido, será solicitado ao usuário.
- */
-export const addHosts = async (ip?: string, aliases?: string[]) => {
-
-  console.info("");
-
-  if (!ip) {
-    const getIp = await inquirer.prompt([
-      {
-        type: 'input',
-        message: 'Digite o IP que deseja usar',
-        default: '127.0.0.1',
-        name: 'ip',
-        required: true,
-        validate: (input: string) => isIPv4(input) ? true : 'Por favor, insira um endereço IPv4 válido.'
-      }
-    ]);
-
-    ip = getIp.ip.trim() as string;
-  } else {
-    if (!isIPv4(ip))
-      throw new Error('Por favor, insira um endereço IPv4 válido.');
-  }
-
-  if (!aliases || aliases.length === 0) {
-    const getAliases = await inquirer.prompt([
-      {
-        type: 'input',
-        message: 'Digite os aliases que deseja usar (separe-os por espaços ou vírgulas)',
-        name: 'aliases',
-        required: true,
-        validate: (input: string) => {
-          input = input.trim();
-          if (!input) return 'Por favor, insira pelo menos um alias.';
-
-          for (let alias of input.split(/\s+|,/)) {
-            alias = alias.trim();
-            if (alias.length === 0)
-              return 'Aliases não podem ser vazios.';
-
-            if (!isValidDomain(alias))
-              return 'Aliases só podem conter letras, números, pontos e hífens.';
-          }
-
+const askForIP = async (): Promise<string> => {
+  const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'ip',
+      message: 'Digite o endereço IP:',
+      default: '127.0.0.1',
+      validate: (input: string) => {
+        if (isIPv4(input) || isIPv6(input)) {
           return true;
         }
-      },
-    ])
-      .then(answers => ({
-        aliases: answers.aliases
-          .trim()
-          .split(/\s+|,/)
-          .map((alias: string) => alias.trim()).filter(Boolean)
-      }) satisfies Omit<Definitions, 'ip'>)
-      .catch((error) => {
-        console.error('Erro ao obter entradas do usuário:', error.message);
-        process.exit(1);
-      })
-
-    aliases = getAliases.aliases as string[];
-  } else {
-    aliases = aliases.map(alias => alias.trim()).filter(Boolean);
-    if (aliases.length === 0)
-      throw new Error('Por favor, insira pelo menos um alias.');
-
-    for (let alias of aliases) {
-      if (!/^[a-zA-Z0-9-.]+$/.test(alias))
-        throw new Error('Aliases só podem conter letras, números, pontos e hífens.');
+        return 'Por favor, insira um endereço IPv4 válido.';
+      }
     }
+  ]);
 
+  return answers.ip as string;
+}
+
+/** 
+ * Solicita ao usuário que insira nomes de host válidos.
+ * 
+ * @returns Uma Promise que resolve para um array de nomes de host inseridos pelo usuário.
+ */
+const askForHostnames = async (): Promise<string[]> => {
+  const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'hostnames',
+      message: 'Digite os nomes de host:',
+      validate: (input: string) => {
+        const hostnames = input.split(' ').map(h => h.trim()).filter(Boolean);
+
+        if (hostnames.every(isValidDomain))
+          return true;
+
+        return 'Por favor, insira nomes de host válidos, separados por espaço.';
+      }
+    }
+  ]);
+
+  return answers.hostnames.split(' ').map((h: string) => h.trim()).filter(Boolean) as string[];
+}
+
+/** 
+ * Solicita ao usuário que insira um comentário opcional.
+ * 
+ * @return Uma Promise que resolve para o comentário inserido pelo usuário, ou null se nenhum comentário for fornecido.
+ */
+const askForComment = async (): Promise<string | null> => {
+  const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'comment',
+      message: 'Digite o comentário a ser adicionado (ou deixe vazio para nenhum comentário):',
+    }
+  ]);
+
+  return answers.comment ? answers.comment as string : null;
+}
+
+/** 
+ * Solicita ao usuário que escolha se deseja adicionar todas as entradas em uma única linha.
+ * 
+ * @return Uma Promise que resolve para true se o usuário desejar adicionar em uma única linha, ou false caso contrário.
+ */
+const askForOneline = async (): Promise<boolean> => {
+  const answers = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'oneline',
+      message: 'Deseja adicionar todas as entradas em uma única linha?',
+      default: false,
+    }
+  ]);
+
+  return answers.oneline as boolean;
+}
+
+/** 
+ * Adiciona entradas ao arquivo de hosts.
+ * 
+ * @param ip O endereço IP para o qual os nomes de host serão mapeados. Se não fornecido, o usuário será solicitado a inseri-lo.
+ * @param hostnames Uma lista de nomes de host a serem adicionados. Se não fornecido, o usuário será solicitado a inseri-los.
+ * @param options Opções adicionais para personalizar o comportamento da adição.
+ * 
+ * @returns Uma Promise que resolve quando as entradas forem adicionadas com sucesso.
+ */
+export const addHosts = async (
+  ip?: string,
+  hostnames?: string[],
+  options?: AddOptions
+): Promise<void> => {
+  let {
+    comment = 'Adicionado com config-hosts',
+    oneline = false,
+  } = options || {};
+
+  if (!ip) {
+    ip = await askForIP();
+    hostnames = await askForHostnames();
+    comment = await askForComment();
+    if (hostnames.length > 1)
+      oneline = await askForOneline();
   }
 
-  const def: Definitions = {
-    ip,
-    aliases
+  if (!hostnames || hostnames.length === 0) {
+    hostnames = await askForHostnames();
   }
 
-  await setHosts(def.ip, def.aliases);
+  const hostsFile = getHostsFile();
+  const content = await fs.promises.readFile(hostsFile, 'utf-8');
+  const entries = parseEntries(content)
+
+  const newEntries = oneline
+    ? [new EntryHost(ip, hostnames, true, comment || undefined)]
+    : hostnames.map(hostname => new EntryHost(ip!, [hostname], true, comment || undefined));
+
+  entries.push(...newEntries);
+
+  await writeHosts(entries);
+
+  console.log(`\nHosts adicionados com sucesso ao arquivo ${hostsFile}!\n`);
+
+  newEntries.forEach(entry => {
+    console.info(`  ${entry.toString()}`);
+  });
 }

@@ -1,3 +1,5 @@
+import { Entry } from "./helpers/parser.js";
+
 /** 
  * Verifica se uma string é um domínio válido.
  * @param domain A string a ser verificada.
@@ -26,4 +28,53 @@ export const domainMatched = (domain: string, ...patterns: string[]): boolean =>
   }
 
   return false;
+}
+
+/** 
+ * Retorna o maior comprimento de IP entre as entradas fornecidas.
+ * 
+ * @param entries Uma matriz de objetos Entry.
+ * 
+ * @return O maior comprimento de IP encontrado nas entradas.
+ */
+export const getLargestIpLength = (entries: Entry[]): number => {
+  return entries.reduce((max, entry) => {
+    if (entry.type === 'entry') {
+      return Math.max(max, entry.ip.length)
+    }
+    return max
+  }, 0)
+}
+
+/** 
+ * Retorna o maior comprimento de hostnames entre as entradas fornecidas.
+ * 
+ * @param entries Uma matriz de objetos Entry.
+ * 
+ * @return O maior comprimento de hostnames encontrado nas entradas.
+ */
+export const getLargestHostnamesLength = (entries: Entry[]): number => {
+  return entries.reduce((max, entry) => {
+    if (entry.type === 'entry') {
+      const hostnamesLength = entry.hostnames.join(' ').length
+      return Math.max(max, hostnamesLength)
+    }
+    return max
+  }, 0)
+}
+
+/** 
+ * Retorna o maior comprimento de comentário entre as entradas fornecidas.
+ * 
+ * @param entries Uma matriz de objetos Entry.
+ * 
+ * @return O maior comprimento de comentário encontrado nas entradas.
+ */
+export const getLargetsCommentLength = (entries: Entry[]): number => {
+  return entries.reduce((max, entry) => {
+    if (entry.type === 'entry' && entry.comment) {
+      return Math.max(max, entry.comment.length)
+    }
+    return max
+  }, 0)
 }
